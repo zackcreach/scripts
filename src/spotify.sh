@@ -6,8 +6,9 @@ ARG1=$1
 ARG2=$2
 ARG3=$3
 
-SPOTIFY_TOKEN_FILENAME='spotify_access_token.txt'
-SPOTIFY_TOKEN_LOCAL=$(cat $SPOTIFY_TOKEN_FILENAME)
+SPOTIFY_TOKEN_FILEPATH="$HOME/Library/Preferences/Spotify"
+SPOTIFY_TOKEN_FILENAME="spotify_access_token.txt"
+SPOTIFY_TOKEN_LOCAL=$(cat "$SPOTIFY_TOKEN_FILEPATH/$SPOTIFY_TOKEN_FILENAME" || echo 'PLACEHOLDER')
 VOLUME_VALUE_DEFAULT=5
 
 request() {
@@ -52,8 +53,9 @@ update_token() {
   local new_token=$(echo $response | json -q access_token)
 
   # Write new token to .zshrc for next script execution
-  # perl -pi -e "s/(?<=SPOTIFY_TOKEN_ACTIVE=)(.+)?/\"$new_token\"/" $HOME/.zshrc
-  $new_token > $SPOTIFY_TOKEN_FILENAME
+  mkdir -p $SPOTIFY_TOKEN_FILEPATH
+
+  echo $new_token > "$SPOTIFY_TOKEN_FILEPATH/$SPOTIFY_TOKEN_FILENAME"
 
   # Return new token
   echo $new_token
@@ -73,6 +75,7 @@ if [[ $ARG2 ]]; then
     response=$(request 'GET' '/currently-playing')
     echo $response | json -q 
     ;;
+
 
   'previous')
     response=$(request 'POST' '/previous')

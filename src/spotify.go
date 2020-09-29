@@ -6,6 +6,7 @@ import (
 	"net/url"
   "io"
   "io/ioutil"
+  "path/filepath"
   "log"
 	"flag"
 	"os"
@@ -14,7 +15,8 @@ import (
   "encoding/json"
 )
 
-var SPOTIFY_TOKEN_FILENAME string = generateFilepath("spotify_access_token.txt")
+var SPOTIFY_TOKEN_FILEPATH string = filepath.Join(os.Getenv("HOME"), "/Library/Preferences/Spotify")
+const SPOTIFY_TOKEN_FILENAME string = "spotify_access_token.txt"
 const HOST string = "https://api.spotify.com/v1/me/player"
 const VALUE_DEFAULT int = 5
 
@@ -49,16 +51,6 @@ func init() {
 	flag.Parse()
 }
 
-func generateFilepath(filename string) string {
-  cwd, err := os.Getwd();
-
-  if err != nil {
-    log.Print("Error: cannot get working directory")
-  }
-
-  return cwd + "/" + filename
-}
-
 func request(method string, path string, options io.Reader, headers map[string]string) []byte {
   client := &http.Client{}
 
@@ -80,10 +72,19 @@ func request(method string, path string, options io.Reader, headers map[string]s
       req.Header.Add(key, value)
     }
   } else {
-    tokenInFile, err := ioutil.ReadFile(SPOTIFY_TOKEN_FILENAME)
+    file := filepath.Join(SPOTIFY_TOKEN_FILEPATH, SPOTIFY_TOKEN_FILENAME)
+    tokenInFile, err := ioutil.ReadFile(file)
+
     if err != nil {
       log.Print("Error: Failed to read token from file: ", err)
-      return nil
+
+      if err := os.MkdirAll(SPOTIFY_TOKEN_FILEPATH, os.ModePerm); err != nil {
+        log.Print("Error: Failed to create directory: ", err)
+      }
+
+      if err := ioutil.WriteFile(file, []byte("PLACEHOLDER"), os.ModePerm); err != nil {
+        log.Print("Error: Failed to write file: ", err)
+      }
     }
     
     var accessToken string = strings.ReplaceAll(string(tokenInFile), "\n", "")
@@ -139,8 +140,10 @@ func updateToken(method string, path string, options io.Reader, headers map[stri
 
   newToken := tokenData.AccessToken
   fmt.Println("Token refreshed: ", newToken)
+  
+  file := filepath.Join(SPOTIFY_TOKEN_FILEPATH, SPOTIFY_TOKEN_FILENAME)
 
-  if err := ioutil.WriteFile(SPOTIFY_TOKEN_FILENAME, []byte(newToken), 0644); err != nil {
+  if err := ioutil.WriteFile(file, []byte(newToken), os.ModePerm); err != nil {
     log.Print("Error: Failed to write file: ", err)
   }
 
@@ -151,9 +154,10 @@ func main() {
 	switch action {
     case "devices":
       response := request("GET", "/devices", nil, nil)
-        fmt.Println(string(response))
+      fmt.Println(string(response))
     case "playing":
-      fmt.Println("Playing")
+      response := request("GET", "/currently-playing", nil, nil)
+      fmt.Println(string(response))
     case "previous":
       fmt.Println("Previous")
     case "next":
